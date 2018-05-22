@@ -32,6 +32,7 @@
 #include <iterator>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <zip.h>
 
@@ -106,7 +107,7 @@ using Uint64 = zip_uint64_t;
  */
 class File {
 private:
-	std::unique_ptr<struct zip_file, int (*)(struct zip_file *)> m_handle;
+	std::unique_ptr<struct zip_file, int (*)(struct zip_file *)> m_handle{nullptr, nullptr};
 
 	File(const File &) = delete;
 	File &operator=(const File &) = delete;
@@ -183,6 +184,22 @@ public:
 
 		return result;
 	}
+
+	/**
+	 * Read all of the contents of the current file into the 
+	 * given vector. Be forewarned that the vector data will
+	 * be cleared before the vector is used.
+	 * 
+	 * \param length the length of the file
+	 * \param vec vector<unsigned char> to place data into 
+	 */
+	void read(Uint64 length, std::vector<unsigned char> &vec) 
+	{
+		vec.clear();
+		vec.resize((unsigned int)length);
+		auto count = read(&vec[0], length);
+		vec.resize(count);
+	}
 };
 
 /**
@@ -234,7 +251,42 @@ inline Source buffer(std::string data) noexcept
 }
 
 /**
- * Add a file to the archive from the disk.
+ * Add a file to the archive from a vector of bytes
+ * 
+ * \param the bytes of data to copy into the archive
+ * \return the source to add
+ */
+inline Source vecBuffer(std::vector<unsigned char> data) noexcept
+{
+	return [=](struct zip *archive) -> struct zip_source * {
+		auto size = data.size();
+		auto ptr = static_cast<char *>(std::malloc(size));
+
+		if (ptr == nullptr) {
+#if defined(_MSC_VER) && _MSC_VER >= 1400
+			char buff[100];
+			strerror_s(buff, 100, errno);
+			throw std::runtime_error(buff);
+#else
+			throw std::runtime_error(std::strerror(errno));
+#endif
+		}
+
+		std::memcpy(ptr, data.data(), size);
+
+		auto src = zip_source_buffer(archive, ptr, size, 1);
+
+		if (src == nullptr) {
+			std::free(ptr);
+			throw std::runtime_error(zip_strerror(archive));
+		}
+
+		return src;
+	};
+}
+
+/**
+ * Add a file to the archive from the disk. Does not verify that the file exists.
  *
  * \param path the path to the file
  * \param start the position where to start
@@ -547,6 +599,15 @@ public:
 
 		m_handle = { archive, zip_close };
 	}
+
+	/**
+     *  After calling close(), do not use this Archive again as it has been closed.
+     */
+    inline void close() 
+	{
+		struct zip *archive = m_handle.release();
+		zip_close(archive);
+    }
 
 	/**
 	 * Move constructor defaulted.
