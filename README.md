@@ -19,7 +19,30 @@ The benefits:
   - Easy file reading in archive,
   - Convenience, thanks to C++ function overloads.
 
-Documentation
+Documentation (copied from `mainpage.cpp`)
 -------------
 
-See the the [API reference](http://markand.bitbucket.org/libzip).
+### Installation
+
+Just copy the file zippy.hpp and add it to your project.
+
+### Overview
+
+A simple example of the extraction of a file.
+
+```cpp
+#include <iostream>
+
+#include "zippy.hpp"
+try {
+	  zippy::Archive archive("mydata.zip");
+ 	  zippy::Stat stat = archive.stat("README");
+ 	  zippy::File file = archive.open("README");
+ 
+ 	  std::cout << "content of README:" << std::endl;
+ 	  std::cout << file.read(stat.size);
+} catch (const std::exception &ex) {
+ 	  std::cerr << ex.what() << std::endl;
+}
+```
+
