@@ -1,6 +1,10 @@
 libzip++ -- A safe modern C++ wrapper around libzip
 ===================================================
 
+Info about this repo
+--------------------
+This repo was originally found [here](https://bitbucket.org/markand/libzip/), but @markand has since taken the repo down for unknown reasons. The library had a permissive license, so I have re-uploaded the library here for historical purposes. This version unfortunately does not represent the latest version that @markand had available since the project I was using it for never updated to the latest version.
+
 Introduction
 ------------
 
