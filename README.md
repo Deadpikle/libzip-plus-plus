@@ -46,3 +46,7 @@ try {
 }
 ```
 
+Other libzip wrappers
+---------------------
+
+* [libzippp](https://github.com/ctabin/libzippp)
