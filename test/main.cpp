@@ -1,7 +1,7 @@
 /*
  * main.cpp -- test the zip wrapper functions
  *
- * Copyright (c) 2013-2015 David Demelier <markand@malikania.fr>
+ * Copyright (c) 2013-2018 David Demelier <markand@malikania.fr>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,278 +16,268 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <gtest/gtest.h>
+#define BOOST_TEST_MODULE "libzip++"
+#include <boost/test/unit_test.hpp>
 
-#include <zippy.hpp>
+#include <zip.hpp>
 
-using namespace zippy;
-using namespace zippy::source;
+namespace libzip {
 
-/* --------------------------------------------------------
- * Sources
- * -------------------------------------------------------- */
+namespace {
 
-TEST(Source, file)
+/*
+ * Sources.
+ * ------------------------------------------------------------------
+ */
+
+BOOST_AUTO_TEST_SUITE(sources)
+
+BOOST_AUTO_TEST_CASE(file)
 {
 	remove("output.zip");
 
-	try {
-		Archive archive("output.zip", ZIP_CREATE);
-
-		archive.add(file(DIRECTORY "data.txt"), "data.txt");
-	} catch (const std::exception &ex) {
-		std::cerr << ex.what() << std::endl;
+	{
+		archive archive("output.zip", ZIP_CREATE);
+		archive.add(source_file(DIRECTORY "data.txt"), "data.txt");
 	}
 
-	try {
-		Archive archive("output.zip");
+	archive archive("output.zip");
 
-		auto stats = archive.stat("data.txt");
-		auto file = archive.open("data.txt");
-		auto content = file.read(stats.size);
+	auto stats = archive.stat("data.txt");
+	auto file = archive.open("data.txt");
+	auto content = file.read(stats.size);
 
-		ASSERT_EQ("abcdef\n", content);
-	} catch (const std::exception &ex) {
-		std::cerr << ex.what() << std::endl;
-	}
+	BOOST_TEST(content == "abcdef\n");
 }
 
-TEST(Source, buffer)
+BOOST_AUTO_TEST_CASE(buffer)
 {
 	remove("output.zip");
 
-	try {
-		Archive archive("output.zip", ZIP_CREATE);
-
-		archive.add(buffer("abcdef"), "data.txt");
-	} catch (const std::exception &ex) {
-		std::cerr << ex.what() << std::endl;
+	{
+		archive archive("output.zip", ZIP_CREATE);
+		archive.add(source_buffer("abcdef"), "data.txt");
 	}
 
-	try {
-		Archive archive("output.zip");
+	archive archive("output.zip");
 
-		auto stats = archive.stat("data.txt");
-		auto file = archive.open("data.txt");
-		auto content = file.read(stats.size);
+	auto stats = archive.stat("data.txt");
+	auto file = archive.open("data.txt");
+	auto content = file.read(stats.size);
 
-		ASSERT_EQ("abcdef", content);
-	} catch (const std::exception &ex) {
-		std::cerr << ex.what() << std::endl;
-	}
+	BOOST_TEST(content == "abcdef");
 }
 
-/* --------------------------------------------------------
- * Write
- * -------------------------------------------------------- */
+BOOST_AUTO_TEST_SUITE_END()
 
-TEST(Write, simple)
+/*
+ * Write.
+ * ------------------------------------------------------------------
+ */
+
+BOOST_AUTO_TEST_SUITE(write)
+
+BOOST_AUTO_TEST_CASE(simple)
 {
 	remove("output.zip");
 
-	// Open first and save some data
-	try {
-		Archive archive("output.zip", ZIP_CREATE);
-
-		archive.add(buffer("hello world!"), "DATA");
-	} catch (const std::exception &ex) {
-		std::cerr << "warning: " << ex.what() << std::endl;
+	// Open first and save some data.
+	{
+		archive archive("output.zip", ZIP_CREATE);
+		archive.add(source_buffer("hello world!"), "DATA");
 	}
 
-	try {
-		Archive archive("output.zip");
+	archive archive("output.zip");
 
-		auto stats = archive.stat("DATA");
-		auto file = archive.open("DATA");
-		auto content = file.read(stats.size);
+	auto stats = archive.stat("DATA");
+	auto file = archive.open("DATA");
+	auto content = file.read(stats.size);
 
-		ASSERT_EQ(static_cast<decltype(stats.size)>(12), stats.size);
-		ASSERT_EQ("hello world!", content);
-	} catch (const std::exception &ex) {
-		std::cerr << "warning: " << ex.what() << std::endl;
-	}
+	BOOST_TEST(stats.size == 12U);
+	BOOST_TEST(content == "hello world!");
 }
 
-TEST(Write, notexist)
+BOOST_AUTO_TEST_CASE(notexist)
 {
 	remove("output.zip");
 
-	try {
-		Archive archive("output.zip", ZIP_CREATE);
+	{
+		archive archive("output.zip", ZIP_CREATE);
 
 		/*
-		 * According to the libzip, adding a file that does not exists
+		 * According to libzip, adding a file that does not exists
 		 * on the disk is not an error.
 		 */
-		archive.add(file("file_not_exist"), "FILE");
-	} catch (const std::exception &ex) {
-		FAIL() << ex.what();
+		archive.add(source_file("file_not_exist"), "FILE");
 	}
 }
 
-/* --------------------------------------------------------
- * Reading
- * -------------------------------------------------------- */
+BOOST_AUTO_TEST_SUITE_END()
 
-class ReadingTest : public testing::Test {
+/*
+ * Reading.
+ * ------------------------------------------------------------------
+ */
+
+class reading_test {
 protected:
-	Archive m_archive;
+	archive archive_;
 
-public:
-	ReadingTest()
-		: m_archive(DIRECTORY "stats.zip")
+	reading_test()
+		: archive_(DIRECTORY "stats.zip")
 	{
 	}
 };
 
-TEST_F(ReadingTest, numEntries)
+BOOST_FIXTURE_TEST_SUITE(reading_test_suite, reading_test)
+
+BOOST_AUTO_TEST_CASE(num_entries)
 {
-	ASSERT_EQ(static_cast<Int64>(4), m_archive.numEntries());
+	BOOST_TEST(archive_.get_num_entries() == 4U);
 }
 
-TEST_F(ReadingTest, stat)
+BOOST_AUTO_TEST_CASE(stat)
 {
-	try {
-		Stat stats = m_archive.stat("README");
+	const auto stat = archive_.stat("README");
 
-		ASSERT_EQ(static_cast<decltype(stats.size)>(15), stats.size);
-		ASSERT_STREQ("README", stats.name);
-	} catch (const std::exception &ex) {
-		std::cerr << ex.what() << std::endl;
-	}
+	BOOST_TEST(stat.size == 15U);
+	BOOST_TEST(stat.name == "README");
 }
 
-TEST_F(ReadingTest, exists)
+BOOST_AUTO_TEST_CASE(exists)
 {
-	ASSERT_TRUE(m_archive.exists("README"));
+	BOOST_TEST(archive_.exists("README"));
 }
 
-TEST_F(ReadingTest, read)
+BOOST_AUTO_TEST_CASE(read)
 {
-	try {
-		auto file = m_archive.open("README");
-		auto stats = m_archive.stat("README");
-		auto text = file.read(stats.size);
+	auto file = archive_.open("README");
+	auto stats = archive_.stat("README");
+	auto text = file.read(stats.size);
 
-		ASSERT_EQ("This is a test\n", text);
-	} catch (const std::exception &ex) {
-		std::cerr << "warning: " << ex.what() << std::endl;
-	}
+	BOOST_TEST(text == "This is a test\n");
 }
 
-TEST_F(ReadingTest, increment)
+BOOST_AUTO_TEST_SUITE(iterator)
+
+BOOST_AUTO_TEST_CASE(increment)
 {
 	{
-		Archive::iterator it = m_archive.begin();
+		auto it = archive_.begin();
 
-		ASSERT_STREQ("README", (*it++).name);
+		BOOST_TEST((*it++).name == "README");
 	}
 
 	{
-		Archive::iterator it = m_archive.begin();
+		auto it = archive_.begin();
 
-		ASSERT_STREQ("INSTALL", (*++it).name);
+		BOOST_TEST((*++it).name == "INSTALL");
 	}
 
 	{
-		Archive::iterator it = m_archive.begin() + 1;
+		auto it = archive_.begin() + 1;
 
-		ASSERT_STREQ("INSTALL", (*it).name);
+		BOOST_TEST((*it).name == "INSTALL");
 	}
 }
 
-TEST_F(ReadingTest, decrement)
+BOOST_AUTO_TEST_CASE(decrement)
 {
 	{
-		Archive::iterator it = m_archive.begin() + 1;
+		auto it = archive_.begin() + 1;
 
-		ASSERT_STREQ("INSTALL", (*it--).name);
+		BOOST_TEST((*it--).name == "INSTALL");
 	}
 
 	{
-		Archive::iterator it = m_archive.begin() + 1;
+		auto it = archive_.begin() + 1;
 
-		ASSERT_STREQ("README", (*--it).name);
+		BOOST_TEST((*--it).name == "README");
 	}
 
 	{
-		Archive::iterator it = m_archive.end() - 1;
+		auto it = archive_.end() - 1;
 
-		ASSERT_STREQ("doc/REFMAN", (*it).name);
+		BOOST_TEST((*it).name == "doc/REFMAN");
 	}
 }
 
-TEST_F(ReadingTest, constIncrement)
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(const_iterator)
+
+BOOST_AUTO_TEST_CASE(increment)
 {
 	{
-		Archive::const_iterator it = m_archive.cbegin();
+		auto it = archive_.cbegin();
 
-		ASSERT_STREQ("README", (*it++).name);
+		BOOST_TEST((*it++).name == "README");
 	}
 
 	{
-		Archive::const_iterator it = m_archive.cbegin();
+		auto it = archive_.cbegin();
 
-		ASSERT_STREQ("INSTALL", (*++it).name);
+		BOOST_TEST((*++it).name == "INSTALL");
 	}
 
 	{
-		Archive::const_iterator it = m_archive.cbegin() + 1;
+		auto it = archive_.cbegin() + 1;
 
-		ASSERT_STREQ("INSTALL", (*it).name);
+		BOOST_TEST((*it).name == "INSTALL");
 	}
 }
 
-TEST_F(ReadingTest, constDecrement)
+BOOST_AUTO_TEST_CASE(decrement)
 {
 	{
-		Archive::const_iterator it = m_archive.cbegin() + 1;
+		auto it = archive_.cbegin() + 1;
 
-		ASSERT_STREQ("INSTALL", (*it--).name);
+		BOOST_TEST((*it--).name == "INSTALL");
 	}
 
 	{
-		Archive::const_iterator it = m_archive.cbegin() + 1;
+		auto it = archive_.cbegin() + 1;
 
-		ASSERT_STREQ("README", (*--it).name);
+		BOOST_TEST((*--it).name == "README");
 	}
 
 	{
-		Archive::const_iterator it = m_archive.cend() - 1;
+		auto it = archive_.cend() - 1;
 
-		ASSERT_STREQ("doc/REFMAN", (*it).name);
+		BOOST_TEST((*it).name == "doc/REFMAN");
 	}
 }
 
-TEST_F(ReadingTest, access)
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_CASE(access)
 {
 	{
-		Archive::iterator it = m_archive.begin();
+		auto it = archive_.begin();
 
-		ASSERT_STREQ("README", it->name);
-		ASSERT_STREQ("INSTALL", it[1].name);
+		BOOST_TEST(it->name == "README");
+		BOOST_TEST(it[1].name == "INSTALL");
 	}
 
 	{
-		Archive::const_iterator it = m_archive.cbegin();
+		auto it = archive_.cbegin();
 
-		ASSERT_STREQ("README", it->name);
-		ASSERT_STREQ("INSTALL", it[1].name);
+		BOOST_TEST(it->name == "README");
+		BOOST_TEST(it[1].name == "INSTALL");
 	}
 }
 
-TEST_F(ReadingTest, loop)
+BOOST_AUTO_TEST_CASE(loop)
 {
 	std::vector<std::string> names{"README", "INSTALL", "doc/", "doc/REFMAN"};
 	int i = 0;
 
-	for (const Stat &s : m_archive)
-		ASSERT_STREQ(names[i++].c_str(), s.name);
+	for (const auto& s : archive_)
+		BOOST_TEST(s.name == names[i++]);
 }
 
-int main(int argc, char **argv)
-{
-	testing::InitGoogleTest(&argc, argv);
+} // !namespace
 
-	return RUN_ALL_TESTS();
-}
+} // !libzip
+
+BOOST_AUTO_TEST_SUITE_END()
