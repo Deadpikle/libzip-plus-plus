@@ -36,16 +36,20 @@ A simple example of the extraction of a file.
 ```cpp
 #include <iostream>
 
-#include "zippy.hpp"
-try {
-	  zippy::Archive archive("mydata.zip");
- 	  zippy::Stat stat = archive.stat("README");
- 	  zippy::File file = archive.open("README");
- 
- 	  std::cout << "content of README:" << std::endl;
- 	  std::cout << file.read(stat.size);
-} catch (const std::exception &ex) {
- 	  std::cerr << ex.what() << std::endl;
+#include "zip.hpp"
+
+int main()
+{
+    try {
+        libzip::archive archive("mydata.zip");
+        libzip::stat_info stat = archive.stat("README");
+        libzip::file file = archive.open("README");
+
+        std::cout << "content of README:" << std::endl;
+        std::cout << file.read(stat.size);
+    } catch (const std::exception &ex) {
+        std::cerr << ex.what() << std::endl;
+    }
 }
 ```
 
